@@ -101,6 +101,16 @@ function App() {
 
   useEffect(() => {
     setupTray();
+
+    return () => {
+      // コンポーネントのアンマウント時にトレイアイコンが存在すれば破棄する
+      if (trayIconRef.current) {
+        trayIconRef.current.close(); // destroy() が利用可能な場合
+        trayIconRef.current = null;
+      }
+      // 必要に応じて、メニューもクリア
+      trayMenuRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
