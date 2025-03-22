@@ -11,6 +11,7 @@ import { FaCamera, FaDownload, FaEraser, FaHourglassStart, FaPen } from 'react-i
 import { EraserBrush } from '@erase2d/fabric';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 function uint8ToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -21,7 +22,7 @@ function uint8ToBase64(bytes: Uint8Array): string {
 }
 
 function App() {
-  const [screenshotPath, setScreenshotPath] = useState('');
+  const [_screenshotPath, setScreenshotPath] = useState('');
   const [imageSrc, setImageSrc] = useState('');
   const canvasRef = useRef<Canvas | null>(null);
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
@@ -35,6 +36,10 @@ function App() {
   const [eraserSize, setEraserSize] = useState(20);
   // ペンの太さの state（初期値10）
   const [penSize, setPenSize] = useState(10);
+
+  // ペンと消しゴムそれぞれのPopoverのopen状態を管理
+  const [openPen, setOpenPen] = useState(false);
+  const [openEraser, setOpenEraser] = useState(false);
 
   useEffect(() => {
     async function setupTray() {
@@ -128,12 +133,15 @@ function App() {
         stroke: 'rgba(255,255,255,0.4)',
         strokeWidth: 2,
         strokeUniform: true,
-        // 角を丸くするためのclipPath設定
       });
 
       canvas.add(img);
       setTopImage(img);
       canvas.renderAll();
+
+      return () => {
+        canvas.dispose();
+      };
     }
     screenShotImageSetUp();
   }, [imageSrc]);
@@ -174,6 +182,9 @@ function App() {
   // ペンモードへの切り替え／解除
   const togglePenMode = () => {
     if (!canvasRef.current) return;
+    // もし消しゴムのPopoverが開いていたら閉じる
+    if (openEraser) setOpenEraser(false);
+    setOpenPen((prev) => !prev);
     const canvas = canvasRef.current;
     if (mode !== 'pen') {
       canvas.isDrawingMode = true;
@@ -191,6 +202,8 @@ function App() {
   // 消しゴムモードへの切り替え／解除
   const toggleEraserMode = () => {
     if (!canvasRef.current) return;
+    // もしペンのPopoverが開いていたら閉じる
+    if (openPen) setOpenPen(false);
     const canvas = canvasRef.current;
     if (mode !== 'eraser') {
       canvas.isDrawingMode = true;
@@ -202,11 +215,13 @@ function App() {
       canvas.isDrawingMode = false;
       setMode('default');
     }
+    // 消しゴムのPopoverの状態もトグル
+    setOpenEraser((prev) => !prev);
   };
 
   // currentColor の変更時に、すでにペンモードなら freeDrawingBrush の色を更新する
   useEffect(() => {
-    if (canvasRef.current?.freeDrawingBrush && mode == "pen") {
+    if (canvasRef.current?.freeDrawingBrush && mode === "pen") {
       canvasRef.current.freeDrawingBrush.color = currentColor;
       canvasRef.current.requestRenderAll();
     }
@@ -294,66 +309,86 @@ function App() {
         </Button>
       }
 
-      <Button
-        onClick={handleDownload}
-        variant='default'
-        className="flex items-center gap-2 px-4 py-2 rounded bg-green-500 text-white ml-auto"
-      >
-        <FaDownload />
-      </Button>
+      <div className='flex gap-2'>
 
-      <div className='flex'>
         <Button
           onClick={handleDownload}
+          variant='outline'
         >
           <FaDownload />
         </Button>
+
         <Button variant='outline' onClick={backToStartPosition}>
           <FaHourglassStart />
         </Button>
 
-        <div>
-          <Button
-            variant={mode === 'pen' ? "default" : "outline"}
-            onClick={togglePenMode}
-          >
-            <FaPen />
-          </Button>
-          {mode === "pen" && (
-            <div style={{ marginTop: 16 }}>
-              <input type="color" value={currentColor} onChange={(e) => setCurrentColor(e.target.value)} />
-              <div style={{ width: 200, marginTop: 16 }}>
-                <Slider
-                  defaultValue={[penSize]}
-                  min={0}
-                  max={100}
-                  step={1}
-                />
-                <div>ペンの太さ: {penSize}</div>
-              </div>
+        {/* ペン用Popover */}
+        <Popover
+          open={openPen}
+          onOpenChange={(nextOpen) => {
+            // 外クリックでは閉じさせない
+            if (!nextOpen && openPen) return;
+            setOpenPen(nextOpen);
+          }}
+        >
+          <PopoverTrigger>
+            <span>
+              <Button
+                variant={mode === 'pen' ? "default" : "outline"}
+                onClick={togglePenMode}
+              >
+                <FaPen />
+              </Button>
+            </span>
+          </PopoverTrigger>
+          <PopoverContent>
+            <input type="color" value={currentColor} onChange={(e) => setCurrentColor(e.target.value)} />
+            <div style={{ width: 200, marginTop: 16 }}>
+              <Slider
+                defaultValue={[penSize]}
+                min={0}
+                max={100}
+                step={1}
+                onValueChange={(value) => setPenSize(value[0])}
+              />
+              <div>ペンの太さ: {penSize}</div>
             </div>
-          )}
-        </div>
+          </PopoverContent>
+        </Popover>
 
-        <div>
-          <Button
-            variant={mode === 'eraser' ? "default" : "outline"}
-            onClick={toggleEraserMode}
+        {/* 消しゴム用Popover */}
+        <Popover
+          open={openEraser}
+          onOpenChange={(nextOpen) => {
+            // 外クリックでは閉じさせない
+            if (!nextOpen && openEraser) return;
+            setOpenEraser(nextOpen);
+          }}
+        >
+          <PopoverTrigger
           >
-            <FaEraser />
-          </Button>
-          {mode === 'eraser' && (
+            <span>
+              <Button
+                onClick={toggleEraserMode}
+                variant={mode === 'eraser' ? "default" : "outline"}
+              >
+                <FaEraser />
+              </Button>
+            </span>
+          </PopoverTrigger>
+          <PopoverContent>
             <div style={{ width: 200, marginTop: 16 }}>
               <Slider
                 defaultValue={[eraserSize]}
                 min={0}
                 max={100}
                 step={1}
+                onValueChange={(value) => setEraserSize(value[0])}
               />
               <div>消しゴムサイズ: {eraserSize}</div>
             </div>
-          )}
-        </div>
+          </PopoverContent>
+        </Popover>
 
       </div>
       <div className="border rounded-lg overflow-hidden mt-4">
