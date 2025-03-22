@@ -7,7 +7,6 @@ use once_cell::sync::OnceCell;
 
 static DISPLAY_NUM: OnceCell<Mutex<Option<String>>> = OnceCell::new();
 
-
 // ffmpegで使用できるデバイスを検出する
 // アプリの起動時にdetect_device()を実行し出力結果を .jsonに格納する
 #[tauri::command]

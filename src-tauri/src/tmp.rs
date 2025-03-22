@@ -1,7 +1,6 @@
 use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
 use std::sync::{Arc, Mutex};
-// use tauri::command;
 use tauri::Manager;
 use chrono::Local;
 use std::env;
@@ -9,7 +8,6 @@ use dotenv;
 
 use crate::detect_device;
 use detect_device::get_display_num;
-// use crate::get_mouse_position::listen_mouse_click;
 
 pub struct AppState {
     pub listener_process: Mutex<Option<std::process::Child>>, // マウス位置取得プロセス
@@ -19,7 +17,6 @@ pub struct AppState {
 #[tauri::command]
 pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
     dotenv::dotenv().ok();
-    // let input_device_id = env::var("INPUT_DEVICE_ID").unwrap_or("0".to_string());
     let display_num = get_display_num().unwrap_or("0".to_string());
     println!("display_num: {:?}", display_num);
 
@@ -28,8 +25,7 @@ pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
     let output_path = format!("{}/{}.mp4", output_dir, timestamp);
     println!("output_path: {}", output_path);
 
-    // let mut current_dir = env::current_dir().expect("Failed to get current dir");
-    // println!("current_dir: {:?}", current_dir);
+    let listener_path = "bin/get-mouse-position";
 
     let ffmpeg_path = if cfg!(target_os = "windows") {
         "src-tauri/bin/ffmpeg.exe"
@@ -54,8 +50,6 @@ pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
         args.extend(["-pixel_format", "uyvy422"]);
     }
 
-
-    let listener_path = "bin/get-mouse-position";
     let mut child = Command::new(listener_path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -82,13 +76,14 @@ pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
         *guard = Some(child);
     }
 
+    
     let mut command = Command::new(ffmpeg_path);
     command.args(&args);
-    command.stdin(Stdio::piped());  // 正常終了させるためにstdinのパイプも有効にする, 停止するために qを入力するから
+    command.stdin(Stdio::piped());
     match command.spawn() {
-        Ok(child) => { // プロセスをapp_stateに格納
-            let app_state = app_handle.state::<Arc<AppState>>(); // アプリケーションのグローバルな状態を取得
-            let mut process = app_state.recording_process.lock().unwrap(); // Mutexをロックして他のスレッドからアクセスできないようにし、起動したプロセスを格納
+        Ok(child) => {
+            let app_state = app_handle.state::<Arc<AppState>>();
+            let mut process = app_state.recording_process.lock().unwrap();
             *process = Some(child);
             println!("Recording started, output path: {}", output_path.to_string());
             Ok(output_path.to_string())
@@ -96,7 +91,6 @@ pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
         Err(e) => Err(format!("Failed to start recording: {}", e)),
     }
 }
-
 
 #[tauri::command]
 pub fn stop_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
@@ -106,26 +100,24 @@ pub fn stop_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
         // println!("Listener stopped successfully");
     }
 
-
     let app_state = app_handle.state::<Arc<AppState>>();
     let mut process = app_state.recording_process.lock().unwrap();
     if let Some(mut child) = process.take() {
-        // 正常終了のため、ffmpegに"q"を送信する
         if let Some(ref mut stdin) = child.stdin {
             use std::io::Write;
             if let Err(e) = stdin.write_all(b"q") {
                 return Err(format!("Failed to send quit command: {}", e));
             }
         }
-        // プロセスが終了するのを待機する
         match child.wait() {
             Ok(_) => {
                 println!("Recording stopped successfully");
-                Ok("Recording stopped".to_string())
+                return Ok("Recording stopped".to_string())
             }
-            Err(e) => Err(format!("Failed to stop recording: {}", e)),
+            Err(e) => return Err(format!("Failed to stop recording: {}", e)),
         }
     } else {
-        Err("No recording process found".to_string())
+        return Err("No recording process found".to_string())
     }
 }
+

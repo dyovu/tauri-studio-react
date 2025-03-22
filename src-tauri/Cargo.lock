@@ -3865,6 +3865,7 @@ dependencies = [
  "dotenv",
  "once_cell",
  "rdev",
+ "regex",
  "serde",
  "serde_json",
  "tauri",
