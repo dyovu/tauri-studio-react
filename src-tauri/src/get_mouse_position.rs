@@ -1,11 +1,20 @@
 use chrono::Local;
 use rdev::{listen, Event, EventType, Button};
 
+// static LAST_POSITION: Arc<Mutex<(f32, f32)>> = Arc::new(Mutex::new((0.0, 0.0)));
+// static CLICK_RECORDS: Arc<Mutex<Vec<ClickRecord>>> = Arc::new(Mutex::new(Vec::new()));
+
 /// マウスクリックのイベントをリッスンして、位置と時間を取得します。
 pub fn listen_mouse_click<F>(callback: F) -> Result<(), Box<dyn std::error::Error>>
 where
     F: Fn((i32, i32), String) + Send + 'static,
 {
+    // let position_clone = LAST_POSITION.clone();
+    // let records_clone = CLICK_RECORDS.clone();
+
+    // let start_time = Instant::now();
+
+
     // マウスイベントを非同期でリッスン
     std::thread::spawn(move || {
         if let Err(error) = listen(move |event| {

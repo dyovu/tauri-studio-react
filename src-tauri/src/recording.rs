@@ -8,7 +8,7 @@ use dotenv;
 
 use crate::detect_device;
 use detect_device::get_display_num;
-use crate::get_mouse_position::listen_mouse_click;
+// use crate::get_mouse_position::listen_mouse_click;
 
 #[tauri::command]
 pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
@@ -52,22 +52,7 @@ pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
     let mut command = Command::new(ffmpeg_path);
     command.args(&args);
     // 正常終了させるためにstdinのパイプも有効にする, 停止するために qを入力するから
-    command.stdin(Stdio::piped());
-
-
-    // // マウスクリック情報を保存する配列を作成
-    // let mouse_events = Arc::new(Mutex::new(Vec::new()));
-    // // マウスイベントを監視
-    // {
-    //     let mouse_events = Arc::clone(&mouse_events);
-    //     listen_mouse_click(move |position, timestamp| {
-    //         let mut events = mouse_events.lock().unwrap();
-    //         events.push((position, timestamp.clone()));
-    //         println!("Mouse clicked at {:?} at {}", position, timestamp);
-    //     }).expect("Failed to start mouse listener");
-        
-    // }
-    
+    command.stdin(Stdio::piped());    
 
     match command.spawn() {
         Ok(child) => { // プロセスをapp_stateに格納
