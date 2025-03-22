@@ -18,10 +18,10 @@ pub struct AppState {
     pub recording_process: Mutex<Option<std::process::Child>>, // 画面録画プロセス
 }
 
-#[derive(Serialize, Debug)]
-struct ClickRecord {
-    timing: f32,
-    point: [f32; 2],
+#[derive(Serialize, Debug, Clone)]
+pub struct ClickRecord {
+    pub timing: f32,
+    pub point: [f32; 2],
 }
 
 static CLICK_RECORDS: Lazy<Mutex<Vec<ClickRecord>>> = Lazy::new(|| Mutex::new(Vec::new()));
@@ -142,8 +142,9 @@ pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
     }
 }
 
+
 #[tauri::command]
-pub fn stop_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
+pub fn stop_recording(app_handle: tauri::AppHandle) -> Result<Vec<ClickRecord>, String> {
     let state = app_handle.state::<Arc<AppState>>();
     if let Some(mut listener_process) = state.listener_process.lock().unwrap().take() {
         listener_process
@@ -166,7 +167,9 @@ pub fn stop_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
         match child.wait() {
             Ok(_) => {
                 println!("Recording stopped successfully");
-                Ok("Recording stopped".to_string())
+                // CLICK_RECORDSをそのまま返す
+                let click_records = CLICK_RECORDS.lock().unwrap();
+                Ok(click_records.clone())
             }
             Err(e) => Err(format!("Failed to stop recording: {}", e)),
         }
