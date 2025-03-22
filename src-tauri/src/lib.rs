@@ -5,6 +5,7 @@ use tauri::Manager;
 mod recording;
 mod detect_device;
 mod screenshot;
+mod transform_cordinate;
 use recording::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -22,6 +23,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![recording::start_recording, recording::stop_recording, screenshot::take_screenshot])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
