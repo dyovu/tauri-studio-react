@@ -1,14 +1,24 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+use std::sync::{Arc, Mutex};
+// use tauri::command;
+use tauri::Manager;
+
+mod recording;
+mod detect_device;
+mod screenshot;
+mod get_mouse_position;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            let app_handle = app.handle();
+            app.manage(app_handle.clone());
+            let _ = detect_device::detect_device();
+            Ok(())
+        })
+        .manage(Arc::new(Mutex::new(None::<std::process::Child>)))
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![recording::start_recording, recording::stop_recording, screenshot::take_screenshot])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
