@@ -9,9 +9,11 @@ use serde::Serialize;
 use std::env;
 use tauri::Manager;
 
+use crate::transform_cordinate;
+use transform_cordinate::transform_cordinate;
 use crate::detect_device;
 use detect_device::get_display_num;
-// use crate::get_mouse_position::listen_mouse_click;
+
 
 pub struct AppState {
     pub listener_process: Mutex<Option<std::process::Child>>, // マウス位置取得プロセス
@@ -101,17 +103,15 @@ pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
                         .split(",")
                         .map(|s| s.trim().to_string())
                         .collect::<Vec<String>>();
-                    println!("info_vec: {:?}", info_vec);
+                    // println!("info_vec: {:?}", info_vec);
+                    let(x, y) = transform_cordinate(info_vec[0].parse::<f32>().unwrap(), info_vec[1].parse::<f32>().unwrap(),); 
                     let click_record = ClickRecord {
                         timing: info_vec[2].parse::<f32>().unwrap(),
-                        point: [
-                            info_vec[0].parse::<f32>().unwrap(),
-                            info_vec[1].parse::<f32>().unwrap(),
-                        ],
+                        point: [x, y]
                     };
                     let mut click_records = CLICK_RECORDS.lock().unwrap();
                     click_records.push(click_record);
-                    println!("click_records: {:?}", click_records);
+                    // println!("click_records: {:?}", click_records);
                 }
             }
         });

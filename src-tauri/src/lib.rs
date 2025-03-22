@@ -5,6 +5,7 @@ use tauri::Manager;
 mod recording;
 mod detect_device;
 mod screenshot;
+mod transform_cordinate;
 use recording::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
