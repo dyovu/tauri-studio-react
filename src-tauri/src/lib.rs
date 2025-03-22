@@ -20,6 +20,7 @@ pub fn run() {
             listener_process: Mutex::new(None),
             recording_process: Mutex::new(None),
         }))
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![recording::start_recording, recording::stop_recording, screenshot::take_screenshot])
         .run(tauri::generate_context!())

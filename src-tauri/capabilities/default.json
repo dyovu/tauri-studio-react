@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:app:allow-default-window-icon",
     "core:default",
@@ -17,6 +19,8 @@
     "fs:allow-resource-read-recursive",
     "fs:default",
     "fs:allow-create",
+    "process:allow-exit",
+    "process:allow-restart",
     {
       "identifier": "fs:scope",
       "allow": [
@@ -24,6 +28,7 @@
           "path": "$HOME/Downloads/**"
         }
       ]
-    }
+    },
+    "process:default"
   ]
 }
