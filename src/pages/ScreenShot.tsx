@@ -4,14 +4,18 @@ import { readFile } from '@tauri-apps/plugin-fs';
 import { TrayIcon } from '@tauri-apps/api/tray';
 import { defaultWindowIcon } from '@tauri-apps/api/app';
 import { Image as ImageType } from '@tauri-apps/api/image';
-import { Menu } from '@tauri-apps/api/menu';
+import { Menu, MenuItemOptions } from '@tauri-apps/api/menu';
 import { Canvas, FabricImage, Image, PencilBrush, Shadow } from 'fabric';
 import { open, BaseDirectory } from '@tauri-apps/plugin-fs';
-import { FaCamera, FaDownload, FaEraser, FaHourglassStart, FaPen } from 'react-icons/fa';
+import { FaArrowLeft, FaCamera, FaDownload, FaEraser, FaHourglassStart, FaPen } from 'react-icons/fa';
 import { EraserBrush } from '@erase2d/fabric';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ColorPicker from '@/components/ui/color-picker';
+import { ModeToggle } from '@/components/ui/mode-toggle';
+import { Link } from 'react-router-dom';
 
 function uint8ToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -28,50 +32,92 @@ function App() {
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
   const [topImage, setTopImage] = useState<Image | null>(null);
   const [bgImage, setBgImage] = useState<Image | null>(null);
-  // モードは "default"（選択/移動）, "pen"（ペン描画）, "eraser"（消しゴム描画）
   const [mode, setMode] = useState<'default' | 'pen' | 'eraser'>('default');
   const backGroundList = ["/mac.jpg", "/mac2.jpg", "/mac3.jpg", "/mac4.jpg"];
+  const backGroundColorList = ["/red.png", "/blue.png", "/yellow.png", "/light-green.png"];
   const [currentColor, setCurrentColor] = useState("#000000");
-  // 消しゴムサイズの state
   const [eraserSize, setEraserSize] = useState(20);
-  // ペンの太さの state（初期値10）
   const [penSize, setPenSize] = useState(10);
-
-  // ペンと消しゴムそれぞれのPopoverのopen状態を管理
   const [openPen, setOpenPen] = useState(false);
   const [openEraser, setOpenEraser] = useState(false);
+  const trayMenuRef = useRef<Menu | null>(null);
+  const trayIconRef = useRef<TrayIcon | null>(null);
+
+  const takeScreenshot = async () => {
+    try {
+      const path = await invoke<string>('take_screenshot');
+      setScreenshotPath(path);
+
+      const data = await readFile(path);
+      const base64String = uint8ToBase64(data);
+      setImageSrc(`data:image/png;base64,${base64String}`);
+      await updateTrayMenu();
+    } catch (error) {
+      console.error('スクリーンショット取得エラー:', error);
+    }
+  }
+
+  const updateTrayMenu = async () => {
+    if (!trayMenuRef.current || !trayIconRef.current) return;
+
+    const newMenu = await Menu.new({
+      items: [
+        {
+          id: "export",
+          text: "Export",
+          action: async () => {
+            await handleDownload();
+          },
+        } as MenuItemOptions
+      ],
+    });
+
+    await trayIconRef.current.setMenu(newMenu);
+  };
 
   useEffect(() => {
-    async function setupTray() {
-      const menu = await Menu.new({
-        items: [
-          {
-            id: "screenshot",
-            text: "スクショを撮る",
-            action: takeScreenshot
+    updateTrayMenu();
+  }, [imageSrc]);
+
+  const setupTray = async () => {
+    trayMenuRef.current = await Menu.new({
+      items: [
+        {
+          id: "portrait",
+          text: "Take a portrait",
+          action: async () => {
+            await takeScreenshot();
           },
-        ],
-      });
+        } as MenuItemOptions,
+      ],
+    });
 
-      const options = {
-        icon: (await defaultWindowIcon()) as ImageType,
-        menu,
-        menuOnLeftClick: true,
-      };
+    trayIconRef.current = await TrayIcon.new({
+      icon: (await defaultWindowIcon()) as ImageType,
+      menu: trayMenuRef.current,
+      menuOnLeftClick: true,
+    });
+  }
 
-      await TrayIcon.new(options);
-    }
+  useEffect(() => {
     setupTray();
   }, []);
 
   useEffect(() => {
     async function setUpCanvas() {
       if (!canvasElRef.current) return;
+
+      if (canvasRef.current) {
+        canvasRef.current.dispose();
+        canvasRef.current = null;
+      }
+
       const canvas = new Canvas(canvasElRef.current, {
         width: 800,
         height: 500,
         backgroundColor: "#ffffff"
       });
+
       // 初期は選択（移動）モードなので描画モードは無効
       canvas.isDrawingMode = false;
       canvasRef.current = canvas;
@@ -103,6 +149,7 @@ function App() {
 
       return () => {
         canvas.dispose();
+        canvasRef.current = null;
       };
     }
     setUpCanvas();
@@ -138,26 +185,14 @@ function App() {
       canvas.add(img);
       setTopImage(img);
       canvas.renderAll();
-
-      return () => {
-        canvas.dispose();
-      };
     }
+
     screenShotImageSetUp();
   }, [imageSrc]);
 
-  const takeScreenshot = async () => {
-    try {
-      const path = await invoke<string>('take_screenshot');
-      setScreenshotPath(path);
-
-      const data = await readFile(path);
-      const base64String = uint8ToBase64(data);
-      setImageSrc(`data:image/png;base64,${base64String}`);
-    } catch (error) {
-      console.error('スクリーンショット取得エラー:', error);
-    }
-  };
+  function updateColor(color: string) {
+    setCurrentColor(color)
+  }
 
   const handleDownload = async () => {
     if (!canvasElRef.current) return;
@@ -179,7 +214,6 @@ function App() {
     });
   };
 
-  // ペンモードへの切り替え／解除
   const togglePenMode = () => {
     if (!canvasRef.current) return;
     // もし消しゴムのPopoverが開いていたら閉じる
@@ -199,7 +233,6 @@ function App() {
     }
   };
 
-  // 消しゴムモードへの切り替え／解除
   const toggleEraserMode = () => {
     if (!canvasRef.current) return;
     // もしペンのPopoverが開いていたら閉じる
@@ -219,7 +252,6 @@ function App() {
     setOpenEraser((prev) => !prev);
   };
 
-  // currentColor の変更時に、すでにペンモードなら freeDrawingBrush の色を更新する
   useEffect(() => {
     if (canvasRef.current?.freeDrawingBrush && mode === "pen") {
       canvasRef.current.freeDrawingBrush.color = currentColor;
@@ -227,7 +259,6 @@ function App() {
     }
   }, [currentColor, mode]);
 
-  // eraserSize の変更時に、消しゴムモードなら brush のサイズを更新
   useEffect(() => {
     if (canvasRef.current && mode === 'eraser' && canvasRef.current.freeDrawingBrush instanceof EraserBrush) {
       canvasRef.current.freeDrawingBrush.width = eraserSize;
@@ -235,7 +266,6 @@ function App() {
     }
   }, [eraserSize, mode]);
 
-  // penSize の変更時に、ペンモードなら brush の太さを更新
   useEffect(() => {
     if (canvasRef.current && mode === 'pen' && canvasRef.current.freeDrawingBrush instanceof PencilBrush) {
       canvasRef.current.freeDrawingBrush.width = penSize;
@@ -302,104 +332,152 @@ function App() {
 
   return (
     <div>
-      <h1>スクリーンショットアプリ</h1>
-      {!topImage &&
-        <Button variant='outline' onClick={takeScreenshot}>
-          <FaCamera />
-        </Button>
-      }
-
-      <div className='flex gap-2'>
-
-        <Button
-          onClick={handleDownload}
-          variant='outline'
-        >
-          <FaDownload />
-        </Button>
-
-        <Button variant='outline' onClick={backToStartPosition}>
-          <FaHourglassStart />
-        </Button>
-
-        {/* ペン用Popover */}
-        <Popover
-          open={openPen}
-          onOpenChange={(nextOpen) => {
-            // 外クリックでは閉じさせない
-            if (!nextOpen && openPen) return;
-            setOpenPen(nextOpen);
-          }}
-        >
-          <PopoverTrigger>
-            <span>
-              <Button
-                variant={mode === 'pen' ? "default" : "outline"}
-                onClick={togglePenMode}
-              >
-                <FaPen />
-              </Button>
-            </span>
-          </PopoverTrigger>
-          <PopoverContent>
-            <input type="color" value={currentColor} onChange={(e) => setCurrentColor(e.target.value)} />
-            <div style={{ width: 200, marginTop: 16 }}>
-              <Slider
-                defaultValue={[penSize]}
-                min={0}
-                max={100}
-                step={1}
-                onValueChange={(value) => setPenSize(value[0])}
-              />
-              <div>ペンの太さ: {penSize}</div>
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        {/* 消しゴム用Popover */}
-        <Popover
-          open={openEraser}
-          onOpenChange={(nextOpen) => {
-            // 外クリックでは閉じさせない
-            if (!nextOpen && openEraser) return;
-            setOpenEraser(nextOpen);
-          }}
-        >
-          <PopoverTrigger
+      {/*header*/}
+      <header className='border-b h-[60px]'>
+        <div className="px-3 container mx-auto h-full flex items-center justify-between">
+          <Button
+            variant="outline"
           >
-            <span>
-              <Button
-                onClick={toggleEraserMode}
-                variant={mode === 'eraser' ? "default" : "outline"}
-              >
-                <FaEraser />
-              </Button>
-            </span>
-          </PopoverTrigger>
-          <PopoverContent>
-            <div style={{ width: 200, marginTop: 16 }}>
-              <Slider
-                defaultValue={[eraserSize]}
-                min={0}
-                max={100}
-                step={1}
-                onValueChange={(value) => setEraserSize(value[0])}
-              />
-              <div>消しゴムサイズ: {eraserSize}</div>
-            </div>
-          </PopoverContent>
-        </Popover>
+            <Link to="/">
+              <FaArrowLeft />
+            </Link>
+          </Button>
+          <ModeToggle />
+        </div>
+      </header>
 
-      </div>
-      <div className="border rounded-lg overflow-hidden mt-4">
-        <canvas ref={canvasElRef} id="canvas" />
-      </div>
-      <div>
-        {backGroundList.map((bg) => (
-          <button type='button' onClick={() => handleImageLoad(bg)} key={bg}>
-            <img src={bg} className='size-[100px] object-cover' alt="background" />
-          </button>
-        ))}
+      <div className='min-h-[calc(100vh-70px)] pt-5'>
+        <div className='flex justify-between  mx-auto max-w-[800px] px-3'>
+          <div className='flex items-center gap-2'>
+
+            <Button variant='outline' onClick={backToStartPosition}>
+              <FaHourglassStart />
+            </Button>
+            {/* 
+            {!topImage &&
+              <Button variant='outline' onClick={takeScreenshot}>
+                <FaCamera />
+              </Button>
+            } */}
+
+            {/* ペン用Popover */}
+            <Popover
+              open={openPen}
+              onOpenChange={(nextOpen) => {
+                // 外クリックでは閉じさせない
+                if (!nextOpen && openPen) return;
+                setOpenPen(nextOpen);
+              }}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  variant={mode === 'pen' ? "default" : "outline"}
+                  onClick={togglePenMode}
+                >
+                  <FaPen />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align='start'>
+                <div className='px-2 py-2'>
+                  <div className='mb-4'>
+                    <ColorPicker
+                      currentColor={currentColor}
+                      updateColor={updateColor}
+                    />
+                  </div>
+                  <Slider
+                    defaultValue={[penSize]}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onValueChange={(value) => setPenSize(value[0])}
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* 消しゴム用Popover */}
+            <Popover
+              open={openEraser}
+              onOpenChange={(nextOpen) => {
+                // 外クリックでは閉じさせない
+                if (!nextOpen && openEraser) return;
+                setOpenEraser(nextOpen);
+              }}
+            >
+              <PopoverTrigger
+                asChild
+              >
+                <Button
+                  onClick={toggleEraserMode}
+                  variant={mode === 'eraser' ? "default" : "outline"}
+                >
+                  <FaEraser />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align='start'>
+                <div className='px-2 py-2'>
+                  <Slider
+                    defaultValue={[eraserSize]}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onValueChange={(value) => setEraserSize(value[0])}
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <Button
+            onClick={handleDownload}
+            variant='outline'
+            className='flex gap-3 items-center'
+          >
+            <FaDownload />
+            Export
+          </Button>
+        </div>
+
+
+        <div className='max-w-[800px] mx-auto px-3 pt-5'>
+          <Tabs defaultValue="image" className='w-[250px]'>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="image">Image</TabsTrigger>
+              <TabsTrigger value="color">Color</TabsTrigger>
+            </TabsList>
+            <TabsContent value="image" className='w-[800px] pt-5 mt-0'>
+              <div className='flex gap-3'>
+                {backGroundList.map((bg) => (
+                  <button type='button' onClick={() => handleImageLoad(bg)} key={bg}>
+                    <img src={bg} className='size-[100px] object-cover rounded-xl' alt="background" />
+                  </button>
+                ))}
+              </div>
+            </TabsContent>
+            <TabsContent value="color" className='w-[800px] pt-5 mt-0'>
+              <div className='flex gap-3'>
+                {backGroundColorList.map((bg) => (
+                  <button type='button' onClick={() => handleImageLoad(bg)} key={bg}>
+                    <img src={bg} className='size-[100px] object-cover rounded-xl' alt="background" />
+                  </button>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <div className='pt-5'>
+          <div className="rounded-lg overflow-hidden flex justify-center relative">
+            {!imageSrc && <div className='bg-[rgba(0,0,0,0.3)] w-[calc(800px-24px)] h-[500px] absolute z-10 flex justify-center items-center'>
+              <div>
+                <FaCamera size={50} className='mx-auto mb-3' />
+                <div className='font-bold'>スクショを撮ってください</div>
+              </div>
+            </div>}
+            <canvas ref={canvasElRef} id="canvas" className='px-3' />
+          </div>
+        </div>
       </div>
     </div>
   );
