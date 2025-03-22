@@ -1,8 +1,5 @@
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
-use std::fs;
-use std::path::Path;
-use tauri::command;
 use once_cell::sync::OnceCell;
 
 static DISPLAY_NUM: OnceCell<Mutex<Option<String>>> = OnceCell::new();
@@ -11,11 +8,6 @@ static DISPLAY_NUM: OnceCell<Mutex<Option<String>>> = OnceCell::new();
 // アプリの起動時にdetect_device()を実行し出力結果を .jsonに格納する
 #[tauri::command]
 pub fn detect_device() -> Result<String, String> {
-    /*
-     このプロジェクト外パスにしないとリロードされてしまう、監視対象外の位置を探す
-    */
-    let path = Path::new("./device.conf.json");
-
     let ffmpeg_path = if cfg!(target_os = "windows") {
         "src-tauri/bin/ffmpeg.exe"
     } else {

@@ -1,5 +1,4 @@
 use std::sync::{Arc, Mutex};
-// use tauri::command;
 use tauri::Manager;
 
 mod recording;
