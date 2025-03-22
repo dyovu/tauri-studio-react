@@ -19,6 +19,8 @@
     "fs:allow-resource-read-recursive",
     "fs:default",
     "fs:allow-create",
+    "process:allow-exit",
+    "process:allow-restart",
     {
       "identifier": "fs:scope",
       "allow": [
@@ -26,6 +28,7 @@
           "path": "$HOME/Downloads/**"
         }
       ]
-    }
+    },
+    "process:default"
   ]
 }
