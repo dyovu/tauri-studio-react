@@ -1,12 +1,10 @@
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
-// use tauri::command;
 use chrono::Local;
 use dotenv;
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use std::env;
 use tauri::Manager;
 
 use crate::transform_cordinate;
@@ -42,9 +40,6 @@ pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
     let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
     let output_path = format!("{}/{}.mp4", output_dir, timestamp);
     println!("output_path: {}", output_path);
-
-    // let mut current_dir = env::current_dir().expect("Failed to get current dir");
-    // println!("current_dir: {:?}", current_dir);
 
     let ffmpeg_path = if cfg!(target_os = "windows") {
         "src-tauri/bin/ffmpeg.exe"
